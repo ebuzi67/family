@@ -1,6 +1,6 @@
 // 인터넷이 끊겨도 대시보드가 열리도록 앱 파일을 저장해 둔다.
 // 앱을 고치면 VERSION 숫자를 올린다.
-const VERSION = 5;
+const VERSION = 6;
 const CACHE = `family-dash-v${VERSION}`;
 const FILES = [
   './', 'index.html', 'style.css', 'app.js', 'manifest.json',
@@ -25,7 +25,8 @@ self.addEventListener('fetch', (e) => {
   }
   if (url.origin !== location.origin) return;
   // 앱 파일: 인터넷이 되면 새 것, 안 되면 저장해 둔 것
-  e.respondWith(fetch(e.request).then((res) => {
+  // 브라우저에 남은 옛 파일 말고 늘 새 파일을 받는다 (no-cache)
+  e.respondWith(fetch(e.request.url, { cache: 'no-cache' }).then((res) => {
     const copy = res.clone();
     caches.open(CACHE).then((c) => c.put(e.request, copy));
     return res;
