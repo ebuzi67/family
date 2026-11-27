@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>우리 가족 대시보드</title>
+<meta name="theme-color" content="#cfeaf6">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="img/icon-192.png">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-kid">
+<div id="stage">
+  <!-- 위쪽 메뉴 -->
+  <nav id="tabs">
+    <button data-act="mode" id="modeBtn">◐ 자동</button>
+    <button data-tab="home" class="on">⌂ 대시보드</button>
+    <button data-tab="village">🐻 동물 마을</button>
+    <button data-tab="sticker">★ 스티커</button>
+    <button data-tab="trip">🧳 여행</button>
+    <button data-act="music" id="musicBtn">♫ 음악</button>
+    <button data-tab="settings">⚙ 설정</button>
+  </nav>
+
+  <!-- 대시보드 -->
+  <section id="page-home" class="page on">
+    <header class="top">
+      <div class="clock">
+        <div class="date" id="dateText"></div>
+        <div class="time"><span id="ampm"></span><b id="timeText"></b></div>
+      </div>
+      <div class="card weather" id="weather"></div>
+    </header>
+    <div class="band"></div>
+    <main class="grid">
+      <div class="col left">
+        <div class="card cal" id="cal"></div>
+        <div class="card trip-mini" id="tripMini"></div>
+        <div class="card days2" id="days2"></div>
+      </div>
+      <div class="col right">
+        <div class="card todos" id="todos"></div>
+        <div class="row3">
+          <div class="card kid" id="kidCard"></div>
+          <div class="card dday" id="dday"></div>
+          <div class="card status" id="status"></div>
+        </div>
+      </div>
+    </main>
+    <footer class="foot"><span id="footLeft"></span><span id="footRight"></span></footer>
+    <img class="peek" id="peek" alt="">
+  </section>
+
+  <!-- 동물 마을 -->
+  <section id="page-village" class="page">
+    <div class="vwrap">
+      <div class="card grow" id="grow"></div>
+      <div class="vright">
+        <div class="card village" id="village"></div>
+        <div class="card recent" id="recent"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 스티커 -->
+  <section id="page-sticker" class="page"><div class="card full" id="stickerPage"></div></section>
+  <!-- 여행 -->
+  <section id="page-trip" class="page"><div class="card full" id="tripPage"></div></section>
+  <!-- 설정 -->
+  <section id="page-settings" class="page"><div class="card full scroll" id="settingsPage"></div></section>
+
+  <div id="modal" class="modal hidden"><div class="sheet" id="sheet"></div></div>
+  <div id="toast" class="toast hidden"></div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
