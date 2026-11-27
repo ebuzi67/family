@@ -396,8 +396,10 @@ function renderHero() {
     <div class="links">${links.map((l) => `<button ${l.act}><i style="background:${l.bg}">${l.ic}</i>${esc(l.text)}</button>`).join('')}</div>
     <div class="tag" data-tab="village">${STAGE_NAMES[g.stage]} ${g.a.name}<br><b>${g.stage < 2 ? '다음 단계까지' : '마을 이사까지'} ${g.left}장</b></div>
     <span class="spark" style="right:30px;top:24px;color:#ffb648">✦</span>
-    <div class="chara" data-tab="village"><img src="${img(g.a, g.stage)}" alt=""></div>`;
+    <div class="chara" data-tab="village"><img src="${heroImg(g)}" alt=""></div>`;
 }
+// 메인 화면 그림은 늘 북극곰. 지금 북극곰을 키우는 중이면 그 단계 그림, 아니면 손 흔드는 북극곰
+function heroImg(g) { return g.a.id === 'polarbear' ? img(g.a, g.stage) : 'img/polarbear-2.png'; }
 function renderData() {
   const g = growth();
   const pct = Math.min(100, Math.round((g.got / GROWN_AT) * 100));
