@@ -923,7 +923,7 @@ const ACT = {
     }), '지금 비밀번호');
   },
   wake() { S.settings.wake = !S.settings.wake; save(); if (S.settings.wake) keepAwake(); else if (wakeLock) wakeLock.release(); renderAll(); },
-  full() { const d = document.documentElement; (d.requestFullscreen || d.webkitRequestFullscreen || (() => {})).call(d); },
+  full() { S.settings.full = true; save(); goFull(); toast('전체 화면을 기억했어요. 앱을 다시 열면 첫 터치 때 전체 화면이 돼요'); },
   export() {
     const data = { ...S, weather: null, _app: 'family-dashboard', _at: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
@@ -1056,7 +1056,9 @@ renderAll();
 fetchWeather();
 keepAwake();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepAwake(); renderAll(); } });
-document.addEventListener('click', () => { if (S.settings.wake && !wakeLock) keepAwake(); }, { once: true });
+function goFull() { const d = document.documentElement; if (document.fullscreenElement) return; const f = d.requestFullscreen || d.webkitRequestFullscreen; if (f) Promise.resolve(f.call(d)).catch(() => {}); }
+// 전체 화면은 앱을 다시 열면 풀리므로, 한 번 켠 적이 있으면 화면을 처음 누를 때 다시 켠다
+document.addEventListener('click', () => { if (S.settings.wake && !wakeLock) keepAwake(); if (S.settings.full) goFull(); }, { once: true });
 let lastDay = ymd(today());
 renderNight();
 setInterval(() => {
