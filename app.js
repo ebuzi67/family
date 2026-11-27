@@ -51,6 +51,7 @@ const fresh = () => ({
 
 // ---------- 저장 ----------
 let S;
+let page = 'home';
 function load() {
   try { S = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { S = null; }
   const f = fresh();
@@ -155,9 +156,10 @@ function applyTheme() {
   const t = wantTheme(now);
   const h = now.getHours();
   const cls = ['notranslate', 'theme-' + t];
-  if (t === 'adult') cls.push(h >= 19 || h < 6 ? 'night' : h >= 14 ? 'eve' : 'day');
-  document.body.className = cls.join(' ');
-  $('#modeBtn').textContent = { auto: '◐ 자동', adult: '◐ 어른', kid: '◐ 아이' }[S.settings.mode];
+  if (t === 'adult' && (h >= 19 || h < 6)) cls.push('night');
+  const next = cls.join(' ');
+  if (document.body.className !== next) { document.body.className = next; if (page === 'home') renderHero(); }
+  $('#modeTxt').textContent = { auto: '자동', adult: '어른', kid: '아이' }[S.settings.mode];
 }
 
 // ---------- 화면 크기 맞추기 ----------
@@ -170,7 +172,7 @@ function fit() {
 function renderClock() {
   const d = today();
   const h = d.getHours();
-  $('#dateText').textContent = `${d.getMonth() + 1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일`;
+  $('#dateText').textContent = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일${HOLIDAYS[ymd(d)] ? ' · ' + HOLIDAYS[ymd(d)] : ''}`;
   $('#ampm').textContent = h < 12 ? '오전' : '오후';
   $('#timeText').textContent = `${h % 12 || 12}:${pad2(d.getMinutes())}`;
 }
@@ -215,35 +217,34 @@ async function fetchWeather() {
   } catch (e) { /* 인터넷이 안 되면 마지막에 받은 날씨를 그대로 보여 준다 */ }
   renderWeather();
 }
+let weatherTip = '';
 function renderWeather() {
   const el = $('#weather');
   const W = S.weather;
-  if (!W) { el.innerHTML = `<div class="air g0"><span class="f">미세먼지</span><span class="face">·</span>…</div><div class="now"><div class="d">날씨를 불러오는 중이에요…<br>인터넷 연결을 확인해 주세요.</div></div>`; return; }
+  if (!W) { weatherTip = ''; el.innerHTML = `<div class="wtop"><div class="air g0"><span class="f">미세먼지</span><span class="face">·</span></div><div class="now"><div class="d">날씨를 불러오는 중이에요…<br>인터넷 연결을 확인해 주세요.</div></div></div>`; return; }
   const { w, a } = W;
   const pm10 = a?.current?.pm10, pm25 = a?.current?.pm2_5;
   const [g, gt, face] = airGrade(pm10, pm25);
   const [ic, txt] = WCODE(w.current.weather_code);
   const dd = w.daily;
-  const fc = dd.time.slice(1, 6).map((t, i) => {
+  const fc = dd.time.slice(1, 5).map((t, i) => {
     const d = parse(t); const [e] = WCODE(dd.weather_code[i + 1]);
-    return `<div>${WD[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}<span class="e">${e}</span><b>${Math.round(dd.temperature_2m_max[i + 1])}° <small>${Math.round(dd.temperature_2m_min[i + 1])}°</small></b>비 ${dd.precipitation_probability_max[i + 1] ?? 0}%</div>`;
+    return `<div>${WD[d.getDay()]} ${e} <b>${Math.round(dd.temperature_2m_max[i + 1])}°</b>${Math.round(dd.temperature_2m_min[i + 1])}°</div>`;
   }).join('');
   const rain = dd.precipitation_probability_max[0] ?? 0;
-  const tmin = dd.temperature_2m_min[0];
+  const tmin = dd.temperature_2m_min[0], tmax = dd.temperature_2m_max[0];
   let tip = '나들이하기 좋은 날씨예요';
   if (rain >= 50) tip = '우산 챙기세요 ☂️';
   else if (g >= 3) tip = '마스크 챙기세요 😷';
   else if (tmin <= 0) tip = '많이 추워요. 따뜻하게 입어요 🧣';
   else if (tmin <= 8) tip = '쌀쌀해요. 겉옷 챙기세요 🧥';
-  else if (dd.temperature_2m_max[0] >= 30) tip = '더워요. 물 많이 마셔요 💧';
-  el.innerHTML = `
-    <div class="air g${g}"><span class="f">미세먼지</span><span class="face">${face}</span>${gt}</div>
-    <div class="now"><span class="ic">${ic}</span><span class="t">${Math.round(w.current.temperature_2m)}°</span>
-      <div class="d"><b>${txt}</b><br>최고 ${Math.round(dd.temperature_2m_max[0])}° · 최저 ${Math.round(tmin)}° · 비 ${rain}%<br>미세 ${pm10 != null ? Math.round(pm10) : '-'} · 초미세 ${pm25 != null ? Math.round(pm25) : '-'} ㎍</div></div>
-    <div class="fc">${fc}</div>
-    <div class="tip"><em>나갈 때</em>${tip}</div>`;
-  const t = new Date(W.at);
-  $('#footRight').textContent = `날씨 ${t.getHours() < 12 ? '오전' : '오후'} ${t.getHours() % 12 || 12}:${pad2(t.getMinutes())} 갱신 · ${S.settings.city === 'here' ? '현재 위치' : (CITIES[S.settings.city] || CITIES.seoul)[0]}`;
+  else if (tmax >= 30) tip = '더워요. 물 많이 마셔요 💧';
+  weatherTip = `오늘은 ${txt}, ${Math.round(tmin)}~${Math.round(tmax)}° · ${tip}`;
+  el.innerHTML = `<div class="wtop">
+      <div class="air g${g}"><span class="f">미세먼지</span><span class="face">${face}</span>${gt}</div>
+      <div class="now"><span class="ic">${ic}</span><span class="t">${Math.round(w.current.temperature_2m)}°</span>
+        <div class="d"><b>${txt}</b><br>최고 ${Math.round(tmax)}° · 최저 ${Math.round(tmin)}°<br>비 ${rain}% · 초미세 ${pm25 != null ? Math.round(pm25) : '-'}㎍</div></div>
+    </div><div class="fc">${fc}</div>`;
 }
 
 // ---------- 달력 ----------
@@ -262,19 +263,14 @@ function renderCal() {
       const d = addDays(start, w * 7 + i);
       const ds = ymd(d);
       const evs = eventsOn(ds);
-      const cls = [i === 0 ? 'sun' : i === 6 ? 'sat' : '', HOLIDAYS[ds] ? 'hol' : '', ds === ymd(t) ? 'today' : '', d < parse(ymd(t)) ? 'past' : ''].join(' ');
-      const n = d.getDate() === 1 || (w === 0 && i === 0) ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate();
-      let inner = `<span class="n">${n}</span>`;
-      if (HOLIDAYS[ds]) inner += ` <span class="hn">${HOLIDAYS[ds]}</span>`;
-      const max = HOLIDAYS[ds] ? 1 : 2;
-      evs.slice(0, max).forEach((e) => { inner += `<div class="chip" style="--c:${color(e.who)}">${esc(e.title)}</div>`; });
-      if (evs.length > max) inner += `<div class="more">+${evs.length - max}개 더</div>`;
-      rows += `<td class="${cls}" data-day="${ds}">${inner}</td>`;
+      const cls = [i === 0 ? 'sun' : i === 6 ? 'sat' : '', HOLIDAYS[ds] ? 'hol' : '', ds === ymd(t) ? 'today' : '', d < parse(ymd(t)) ? 'past' : '', evs.length ? 'has' : ''].join(' ');
+      const dots = evs.slice(0, 3).map((e) => `<i style="--c:${color(e.who)}"></i>`).join('');
+      rows += `<td class="${cls}" data-day="${ds}" style="--c:${evs.length ? color(evs[0].who) : 'inherit'}"><span class="n">${d.getDate()}</span><div class="dots">${dots}</div></td>`;
     }
     rows += '</tr>';
   }
   const lg = ['kid', 'mom', 'dad', 'family'].map((k) => `<span><i style="background:${color(k)}"></i>${esc(nm(k))}</span>`).join('');
-  $('#cal').innerHTML = `<div class="ttl" style="--c:#e0533d">${t.getFullYear()}년 ${t.getMonth() + 1}월<div class="legend">${lg}</div><button class="add" data-act="addEvent">+</button></div>
+  $('#cal').innerHTML = `<div class="ttl">${t.getMonth() + 1}월 달력<div class="legend">${lg}</div><button class="add" data-act="addEvent">+</button></div>
     <table><tr>${WD.map((x) => `<th>${x}</th>`).join('')}</tr>${rows}</table>`;
 }
 
@@ -287,15 +283,12 @@ function renderDays2() {
     const evs = eventsOn(ds);
     const list = evs.length ? evs.slice(0, 4).map((e) => {
       const gone = isToday && e.time && e.time < hm;
-      const tm = e.time ? `${+e.time.slice(0, 2) < 12 ? '오전' : '오후'}<br>${(+e.time.slice(0, 2) % 12 || 12)}:${e.time.slice(3)}` : '종일';
+      const tm = e.time ? `${(+e.time.slice(0, 2) % 12 || 12)}:${e.time.slice(3)}` : '종일';
       return `<div class="ev ${gone ? 'gone' : ''}"><span class="tm">${tm}</span><span class="tx" style="--c:${color(e.who)}">${esc(e.title)}</span></div>`;
     }).join('') + (evs.length > 4 ? `<div class="muted">+${evs.length - 4}개 더</div>` : '') : '<div class="empty">일정이 없어요</div>';
-    return `<div data-day="${ds}"><div class="ttl" style="--c:${isToday ? '#e0533d' : '#3f7fd8'}">${label} <small>${d.getMonth() + 1}/${d.getDate()} (${WD[d.getDay()]})${HOLIDAYS[ds] ? ' · ' + HOLIDAYS[ds] : ''}</small></div>${list}</div>`;
+    return `<div data-day="${ds}"><div class="ttl">${label} <small>${d.getMonth() + 1}/${d.getDate()} ${WD[d.getDay()]}</small></div>${list}</div>`;
   };
   $('#days2').innerHTML = col(t, '오늘', true) + col(addDays(t, 1), '내일', false);
-  // 아래쪽 줄: 그 다음 일정
-  const next = S.events.filter((e) => e.date > ymd(addDays(t, 1))).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0];
-  $('#footLeft').textContent = next ? `다음 일정 ${+next.date.slice(5, 7)}/${+next.date.slice(8)} · ${next.title}` : '';
 }
 
 // ---------- 할 일 ----------
@@ -305,19 +298,20 @@ function cleanTodos() {
   for (const k in S.todos) S.todos[k] = S.todos[k].filter((x) => !x.done || x.doneAt === ds);
 }
 function renderTodos() {
-  const col = (k) => {
+  const TINT = { kid: '#fff4df', mom: '#fdeaf1', dad: '#e6f0fd' };
+  const card = (k) => {
     const list = S.todos[k];
-    const items = list.length ? list.map((x) => `<div class="ti"><span class="chk ${x.done ? 'done' : ''}" data-act="toggleTodo" data-k="${k}" data-id="${x.id}">${esc(x.text)}</span><button class="x" data-act="delTodo" data-k="${k}" data-id="${x.id}">✕</button></div>`).join('') : '<div class="empty">할 일이 없어요</div>';
-    const left = list.filter((x) => !x.done).length;
-    return `<div class="tcol"><div class="ttl" style="--c:${color(k)}">${esc(nm(k))} 할 일 <small>${left ? left + '개 남음' : list.length ? '다 했어요!' : ''}</small><button class="add r" data-act="addTodo" data-k="${k}">+</button></div><div class="tlist">${items}</div></div>`;
+    const done = list.filter((x) => x.done).length;
+    const items = list.length ? list.slice(0, 6).map((x) => `<div class="ti"><span class="chk ${x.done ? 'done' : ''}" data-act="toggleTodo" data-k="${k}" data-id="${x.id}">${esc(x.text)}</span><button class="x" data-act="delTodo" data-k="${k}" data-id="${x.id}">✕</button></div>`).join('') + (list.length > 6 ? `<div class="muted">+${list.length - 6}개 더</div>` : '') : '<div class="empty">할 일이 없어요<br>+를 눌러 넣어요</div>';
+    const badge = !list.length ? '' : done === list.length ? '<span class="badge" style="--c:#34b37a">다 했어요!</span>' : `<span class="badge">${list.length - done}개 남음</span>`;
+    return `<div class="mission" style="--tint:${TINT[k]};--c:${color(k)}"><div class="mh">${esc(nm(k))} 할 일 ${badge}<button class="add" data-act="addTodo" data-k="${k}">+</button></div>
+      <div class="inner"><div class="tl">${items}</div><div class="foot"><div class="pbar"><i style="width:${list.length ? (done / list.length) * 100 : 0}%"></i></div>✓ ${done}/${list.length}</div></div></div>`;
   };
-  const common = S.todos.common.map((x) => `<span class="pill" data-act="toggleTodo" data-k="common" data-id="${x.id}" style="${x.done ? 'text-decoration:line-through;opacity:.5' : ''}">${esc(x.text)}</span>`).join('') || '<span class="muted">없어요</span>';
+  $('#missions').innerHTML = card('kid') + card('mom') + card('dad');
+  const common = S.todos.common.map((x) => `<span class="pill ${x.done ? 'done' : ''}" data-act="toggleTodo" data-k="common" data-id="${x.id}">${esc(x.text)}</span>`).join('') || '<span class="muted">없어요</span>';
   const shop = S.shopping.map((x) => `<span class="pill" data-act="bought" data-id="${x.id}">${esc(x.text)}</span>`).join('') || '<span class="muted">살 것이 없어요</span>';
-  $('#todos').innerHTML = `<div class="tcols">${col('kid')}${col('mom')}${col('dad')}</div>
-    <div class="shared">
-      <div class="line"><span class="lbl">공통 할 일</span><div class="pills">${common}</div><button class="add" data-act="addTodo" data-k="common">+</button></div>
-      <div class="line"><span class="lbl shop">장보기 ${S.shopping.length}</span><div class="pills">${shop}</div><button class="add" data-act="addShop">+</button></div>
-    </div>`;
+  $('#shop').innerHTML = `<div class="sec"><div class="lb">🛒 장보기 ${S.shopping.length}<button class="add" data-act="addShop">+</button></div><div class="pills">${shop}</div></div>
+    <div class="sec"><div class="lb">🏠 공통 할 일<button class="add" data-act="addTodo" data-k="common">+</button></div><div class="pills">${common}</div></div>`;
 }
 
 // ---------- 스티커와 동물 ----------
@@ -363,22 +357,53 @@ function autoKidSticker() {
     addSticker(1, '오늘 할 일을 다 했어요', '할 일');
   }
 }
-function renderKid() {
+function vocative(name) {
+  const c = name.charCodeAt(name.length - 1);
+  if (c < 0xac00 || c > 0xd7a3) return name;
+  return name + ((c - 0xac00) % 28 ? '아' : '야');
+}
+function renderKid() { renderHero(); renderData(); }
+function renderHero() {
   const g = growth();
   const s = S.settings;
-  let info = '';
-  if (s.kidBirth) {
-    const b = parse(s.kidBirth);
-    const nb = nextOccur({ m: b.getMonth() + 1, d: b.getDate() });
-    const dd = dayDiff(today(), nb);
-    info = `<b>생일까지 ${dd === 0 ? '오늘! 🎂' : 'D-' + dd}</b> · `;
+  const now = today();
+  const h = now.getHours();
+  const theme = wantTheme(now);
+  const title = theme === 'kid'
+    ? `${esc(vocative(s.names.kid))}, ${h < 11 ? '좋은 아침!' : h >= 19 ? '오늘도 수고했어!' : '안녕!'}`
+    : (h < 12 ? '좋은 아침이에요!' : h < 18 ? '좋은 오후예요!' : '편안한 저녁이에요!');
+  const ds = ymd(now);
+  const todayN = eventsOn(ds).length;
+  const left = ['kid', 'mom', 'dad', 'common'].reduce((a, k) => a + S.todos[k].filter((x) => !x.done).length, 0);
+  // 네 번째 줄: 여행이 있으면 여행, 아니면 가장 가까운 기념일
+  let fourth = { ic: '🎂', bg: '#fdeaf1', text: '기념일을 설정에서 넣어요', act: 'data-tab="settings"' };
+  if (S.trip) {
+    const n = S.trip.date ? dayDiff(now, parse(S.trip.date)) : null;
+    const done = S.trip.items.filter((x) => x.done).length;
+    fourth = { ic: '✈️', bg: '#e6f0fd', text: `${S.trip.title}${n != null && n >= 0 ? ' D-' + n : ''} · 챙김 ${done}/${S.trip.items.length}`, act: 'data-tab="trip"' };
+  } else {
+    const nx = allYearly().map((y) => ({ t: y.title, d: nextOccur(y) })).filter((x) => x.d).sort((a, b) => a.d - b.d)[0];
+    if (nx) { const n = dayDiff(now, nx.d); fourth.text = `${nx.t} ${n === 0 ? '오늘! 🎉' : 'D-' + n}`; fourth.act = ''; }
   }
-  $('#kidCard').innerHTML = `<div class="ttl" style="--c:#e8679a">${esc(s.names.kid)}의 친구 <small>스티커 ${total()}장</small></div>
-    <div class="kbody" data-tab="village"><img src="${img(g.a, g.stage)}" alt="">
-    <div style="flex:1;min-width:0"><div class="nm">${STAGE_NAMES[g.stage]} ${g.a.name}</div><div class="muted">${g.stage + 1}단계 · ${S.stickers.animal + 1}번째 친구</div>
-    <div class="bar"><i style="width:${g.pct}%"></i></div>
-    <div class="info">${g.stage < 2 ? '다음 단계까지' : '다 키우기까지'} <b style="color:var(--ink)">${g.left}장</b><br>${info.replace(' · ', '')}${info ? '<br>' : ''}마을 친구 ${S.stickers.grown.length}마리</div></div></div>`;
-  $('#peek').src = img(g.a, g.stage);
+  const links = [
+    { ic: '📅', bg: '#e6f0fd', text: `오늘 일정 ${todayN}개`, act: `data-day="${ds}"` },
+    { ic: '✅', bg: '#e3f6ec', text: left ? `할 일 ${left}개 남았어요` : '할 일을 다 했어요!', act: '' },
+    { ic: '🛒', bg: '#fff4df', text: S.shopping.length ? `장보기 ${S.shopping.length}개` : '장보기 목록이 비었어요', act: 'data-act="addShop"' },
+    fourth,
+  ];
+  $('#hero').innerHTML = `<h1>${title}</h1>
+    <div class="sub">${esc(weatherTip || '오늘도 즐거운 하루 보내요')}</div>
+    <div class="links">${links.map((l) => `<button ${l.act}><i style="background:${l.bg}">${l.ic}</i>${esc(l.text)}</button>`).join('')}</div>
+    <div class="tag" data-tab="village">${STAGE_NAMES[g.stage]} ${g.a.name}<br><b>${g.stage < 2 ? '다음 단계까지' : '마을 이사까지'} ${g.left}장</b></div>
+    <span class="spark" style="right:30px;top:24px;color:#ffb648">✦</span>
+    <div class="chara" data-tab="village"><img src="${img(g.a, g.stage)}" alt=""></div>`;
+}
+function renderData() {
+  const g = growth();
+  const pct = Math.min(100, Math.round((g.got / GROWN_AT) * 100));
+  const C = 2 * Math.PI * 40;
+  $('#data').innerHTML = `<div class="card ring" data-tab="village"><div class="rc"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" stroke="var(--soft)" stroke-width="10"/><circle cx="50" cy="50" r="40" stroke="var(--accent2)" stroke-width="10" stroke-dasharray="${(C * pct) / 100} ${C}" transform="rotate(-90 50 50)"/></svg><b>${pct}%</b></div><div class="rl2">${g.a.name} 다 키우기</div></div>
+    <div class="mini"><div class="card" data-tab="sticker"><em>⭐</em><b>${total()}</b><span>받은 스티커</span></div><div class="card" data-tab="village"><em>🏡</em><b>${S.stickers.grown.length}</b><span>마을 친구</span></div></div>`;
 }
 
 // ---------- 다가오는 날 ----------
@@ -388,30 +413,21 @@ function renderDday() {
   if (S.trip && S.trip.date && parse(S.trip.date) >= parse(ymd(t))) list.push({ title: `✈️ ${S.trip.title}`, d: parse(S.trip.date) });
   S.events.filter((e) => e.dday && parse(e.date) >= parse(ymd(t))).forEach((e) => list.push({ title: e.title, d: parse(e.date) }));
   list.sort((a, b) => a.d - b.d);
-  const rows = list.slice(0, 7).map((x) => {
+  const rows = list.slice(0, 4).map((x) => {
     const n = dayDiff(t, x.d);
     return `<b>${n === 0 ? 'D-DAY' : 'D-' + n}</b><span>${esc(x.title)}${x.lunar ? ' <small class="muted">(음력)</small>' : ''}</span><span class="dt">${x.d.getMonth() + 1}/${x.d.getDate()}</span>`;
   }).join('');
-  $('#dday').innerHTML = `<div class="ttl" style="--c:#f0a020">다가오는 날<button class="add r" data-act="addDay">+</button></div>${rows ? `<div class="dl">${rows}</div>` : '<div class="empty">설정에서 생일·기념일을 넣어 주세요</div>'}`;
+  $('#dday').innerHTML = `<div class="ttl">다가오는 날<button class="add r" data-act="addDay">+</button></div>${rows ? `<div class="dl">${rows}</div>` : '<div class="empty">+를 눌러 생일·기념일을 넣어 주세요</div>'}`;
 }
 
 // ---------- 엄마·아빠는 지금 ----------
 function renderStatus() {
   const one = (k) => { const [e, t] = STATUS[S.status[k] % STATUS.length]; return `<div class="st" data-act="status" data-k="${k}"><span class="em">${e}</span><div><div class="who">${esc(josa(nm(k), '은', '는'))} 지금</div><div class="what">${t}</div></div></div>`; };
-  $('#status').innerHTML = `<div class="ttl" style="--c:#ffd84d">지금 어디?</div>${one('dad')}${one('mom')}`;
+  $('#status').innerHTML = `<div class="ttl" style="margin-bottom:2px">지금 어디?</div>${one('dad')}${one('mom')}`;
 }
 
 // ---------- 여행 ----------
-function renderTripMini() {
-  const T = S.trip;
-  const el = $('#tripMini');
-  if (!T) { el.innerHTML = `<div class="ttl" style="--c:#2fae6b">여행 준비물</div><div class="empty">계획한 여행이 없어요. <button class="btn sub" data-tab="trip" style="padding:4px 10px;font-size:13px">여행 만들기</button></div>`; return; }
-  const done = T.items.filter((x) => x.done).length;
-  const n = T.date ? dayDiff(today(), parse(T.date)) : null;
-  const when = n == null ? '' : n > 1 ? `D-${n}` : n === 1 ? '내일 출발' : n === 0 ? '오늘 출발' : '여행 중';
-  const items = T.items.slice().sort((a, b) => a.done - b.done).slice(0, 15).map((x) => `<span class="chk ${x.done ? 'done' : ''}" data-act="toggleTrip" data-id="${x.id}">${x.cat === 'buy' ? '🛍️' : ''}${esc(x.text)}</span>`).join('');
-  el.innerHTML = `<div class="ttl" style="--c:#2fae6b">여행 준비물 <small style="color:#e0533d">${when} · ${esc(T.title)}</small><small class="r">챙김 ${done}/${T.items.length}</small></div><div class="items">${items || '<span class="empty">여행 탭에서 준비물을 넣어요</span>'}</div>`;
-}
+function renderTripMini() {}
 function renderTripPage() {
   const T = S.trip;
   const el = $('#tripPage');
@@ -639,10 +655,9 @@ async function keepAwake() {
 }
 
 // ---------- 누르기 처리 ----------
-let page = 'home';
 function showTab(t) {
   page = t;
-  document.querySelectorAll('#tabs [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('#side [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('.page').forEach((p) => p.classList.toggle('on', p.id === 'page-' + t));
   renderAll();
 }
@@ -858,7 +873,7 @@ function demoData() {
 function renderAll() {
   cleanTodos();
   renderClock();
-  if (page === 'home') { renderWeather(); renderCal(); renderTripMini(); renderDays2(); renderTodos(); renderKid(); renderDday(); renderStatus(); }
+  if (page === 'home') { renderWeather(); renderCal(); renderDays2(); renderTodos(); renderKid(); renderDday(); renderStatus(); }
   if (page === 'village') renderVillage();
   if (page === 'sticker') renderStickerPage();
   if (page === 'trip') renderTripPage();
