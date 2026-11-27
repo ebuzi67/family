@@ -1,6 +1,6 @@
 // 인터넷이 끊겨도 대시보드가 열리도록 앱 파일을 저장해 둔다.
 // 앱을 고치면 VERSION 숫자를 올린다.
-const VERSION = 4;
+const VERSION = 5;
 const CACHE = `family-dash-v${VERSION}`;
 const FILES = [
   './', 'index.html', 'style.css', 'app.js', 'manifest.json',

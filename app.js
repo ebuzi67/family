@@ -37,7 +37,7 @@ const HOLIDAYS = {
 };
 
 const fresh = () => ({
-  settings: { names: { mom: '엄마', dad: '아빠', kid: '아이' }, kidBirth: '', schoolStart: '09:00', schoolEnd: '14:40',
+  settings: { names: { mom: '엄마', dad: '아빠', kid: '나율' }, kidBirth: '', schoolStart: '09:00', schoolEnd: '14:40',
     vacStart: '', vacEnd: '', city: 'seoul', lat: null, lon: null, pin: '0000', mode: 'auto', wake: true },
   todos: { mom: [], dad: [], kid: [], common: [] },
   shopping: [],
@@ -59,6 +59,7 @@ function load() {
   for (const k in f) if (S[k] === undefined) S[k] = f[k];
   S.settings = Object.assign(f.settings, S.settings);
   S.settings.names = Object.assign(f.settings.names, S.settings.names);
+  if (S.settings.names.kid === '아이') S.settings.names.kid = '나율'; // 예전 기본 이름이면 나율로
   S.todos = Object.assign(f.todos, S.todos);
   S.stickers = Object.assign(f.stickers, S.stickers);
 }
@@ -837,7 +838,6 @@ function demoData() {
   const d = fresh();
   const t = today();
   const on = (n) => ymd(addDays(t, n));
-  d.settings.names.kid = '하늘';
   d.settings.kidBirth = `${t.getFullYear() - 10}-${pad2(((t.getMonth() + 1) % 12) + 1)}-12`;
   d.todos.kid = [{ id: uid(), text: '수학 익힘책 2쪽' }, { id: uid(), text: '줄넘기 100번' }, { id: uid(), text: '책가방 챙기기' }].map((x) => ({ ...x, done: false }));
   d.todos.mom = ['책 반납하기', '식물 물 주기', '겨울옷 정리'].map((t2) => ({ id: uid(), text: t2, done: false }));
