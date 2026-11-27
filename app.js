@@ -222,7 +222,7 @@ let weatherTip = '';
 function renderWeather() {
   const el = $('#weather');
   const W = S.weather;
-  if (!W) { weatherTip = ''; el.innerHTML = `<div class="wtop"><div class="air g0"><span class="f">미세먼지</span><span class="face">·</span></div><div class="now"><div class="d">날씨를 불러오는 중이에요…<br>인터넷 연결을 확인해 주세요.</div></div></div>`; return; }
+  if (!W) { weatherTip = ''; el.innerHTML = `<div class="wtop"><div class="air g0"><span class="f">미세먼지</span><span class="gt">-</span></div><div class="now"><div class="d">날씨를 불러오는 중이에요…<br>인터넷 연결을 확인해 주세요.</div></div></div>`; return; }
   const { w, a } = W;
   const pm10 = a?.current?.pm10, pm25 = a?.current?.pm2_5;
   const [g, gt, face] = airGrade(pm10, pm25);
@@ -242,7 +242,7 @@ function renderWeather() {
   else if (tmax >= 30) tip = '더워요. 물 많이 마셔요 💧';
   weatherTip = `오늘은 ${txt}, ${Math.round(tmin)}~${Math.round(tmax)}° · ${tip}`;
   el.innerHTML = `<div class="wtop">
-      <div class="air g${g}"><span class="f">미세먼지</span><span class="face">${face}</span>${gt}</div>
+      <div class="air g${g}"><span class="f">미세먼지</span><span class="gt">${gt}</span></div>
       <div class="now"><span class="ic">${ic}</span><span class="t">${Math.round(w.current.temperature_2m)}°</span>
         <div class="d"><b>${txt}</b><br>최고 ${Math.round(tmax)}° · 최저 ${Math.round(tmin)}°<br>비 ${rain}% · 초미세 ${pm25 != null ? Math.round(pm25) : '-'}㎍</div></div>
     </div><div class="fc">${fc}</div>`;

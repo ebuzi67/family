@@ -124,8 +124,8 @@ svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width:
 .weather { height: 128px; flex: none; padding: 12px 14px; }
 .wtop { display: flex; align-items: center; gap: 10px; }
 .air { width: 64px; height: 64px; border-radius: 16px; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; flex: none; line-height: 1.2; }
-.air .f { font-size: 10px; opacity: .9; }
-.air .face { font-size: 18px; }
+.air .f { font-size: 11px; opacity: .9; }
+.air .gt { font-size: 17px; margin-top: 2px; }
 .air.g1 { background: #3d8bfd; } .air.g2 { background: #34b37a; } .air.g3 { background: #f39a2e; } .air.g4 { background: #e5544a; } .air.g0 { background: #a8b0c2; }
 .now { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
 .now .ic { font-size: 34px; }
