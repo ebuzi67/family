@@ -251,3 +251,30 @@ h3 { font-size: 18px; font-weight: 800; margin: 16px 0 8px; display: flex; align
 .cele { position: absolute; inset: 0; z-index: 70; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(240,246,255,.94); font-family: var(--round); font-size: 34px; color: #26314a; }
 .cele img { width: 300px; animation: pop .8s ease-out; }
 @keyframes pop { 0% { transform: scale(.2) rotate(-20deg); } 70% { transform: scale(1.1); } }
+
+/* ---------- 반복 표시, 요일 고르기 ---------- */
+.rp { font-size: 11px; margin-left: 4px; opacity: .7; }
+.sheet .opts.multi button { min-width: 44px; }
+.sheet .opts .preset { background: #fff; border: 1.5px dashed #c9d0de; color: #6b7387; }
+.rwt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 보상 쿠폰 ---------- */
+.coupons { display: flex; flex-direction: column; gap: 8px; }
+.coupon { display: flex; align-items: center; gap: 12px; background: var(--soft); border-radius: 16px; padding: 10px 14px; border: 2px dashed #d5dbe7; }
+.coupon .cn { font-weight: 800; color: var(--accent); width: 54px; }
+.coupon b { font-size: 15px; }
+.coupon .bar { margin: 6px 0 0; height: 8px; background: #fff; }
+.coupon.ready { border-color: #ffb648; background: #fff7e8; }
+.coupon.used { opacity: .55; }
+.coupon .btn { padding: 7px 12px; font-size: 14px; background: #ffb648; }
+
+/* ---------- 밤 화면 ---------- */
+.night { position: absolute; inset: 0; z-index: 80; background: #070b16; color: #6f7a98; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+.night .nd { font-size: 26px; font-weight: 700; }
+.night .nt { font-size: 170px; font-weight: 800; color: #9aa5c4; line-height: 1; letter-spacing: -4px; margin-top: 6px; }
+.night .nt span { font-size: 36px; letter-spacing: 0; margin-right: 12px; font-weight: 700; }
+.night .nn { font-size: 20px; margin-top: 18px; color: #8691b0; }
+.night img { width: 150px; margin-top: 26px; filter: brightness(.45) saturate(.6); }
+.night .nz { font-size: 18px; letter-spacing: 6px; margin-top: -4px; animation: bob 3s ease-in-out infinite; }
+.night .nh { position: absolute; bottom: 22px; font-size: 13px; color: #3e4763; }
+.coupon .grow1 { flex: 1; min-width: 0; }

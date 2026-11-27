@@ -38,7 +38,10 @@ const HOLIDAYS = {
 
 const fresh = () => ({
   settings: { names: { mom: '엄마', dad: '아빠', kid: '나율' }, kidBirth: '', schoolStart: '09:00', schoolEnd: '14:40',
-    vacStart: '', vacEnd: '', city: 'seoul', lat: null, lon: null, pin: '0000', mode: 'auto', wake: true },
+    vacStart: '', vacEnd: '', city: 'seoul', lat: null, lon: null, pin: '0000', mode: 'auto', wake: true,
+    nightOn: true, nightStart: '22:00', nightEnd: '06:00' },
+  routines: [],
+  rewards: [],
   todos: { mom: [], dad: [], kid: [], common: [] },
   shopping: [],
   events: [],
@@ -75,6 +78,13 @@ const parse = (s) => { const [y, m, d] = s.split('-').map(Number); return new Da
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const dayDiff = (a, b) => Math.round((parse(ymd(b)) - parse(ymd(a))) / 86400000);
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
+const daysText = (d) => {
+  const a = [...d].map(Number).sort();
+  if (a.length === 7) return '매일';
+  if (a.join() === '1,2,3,4,5') return '평일';
+  if (a.join() === '0,6') return '주말';
+  return '매주 ' + a.map((i) => WD[i]).join('·');
+};
 const nm = (who) => (who === 'family' ? '가족' : S.settings.names[who] || WHO[who]);
 const color = (who) => `var(--${who || 'family'})`;
 const today = () => new Date();
@@ -250,7 +260,10 @@ function renderWeather() {
 
 // ---------- 달력 ----------
 function eventsOn(ds) {
-  const list = S.events.filter((e) => e.date === ds).map((e) => ({ ...e, kind: 'ev' }));
+  const wd = parse(ds).getDay();
+  const list = S.events.filter((e) => (e.wd && e.wd.length
+    ? ds >= e.date && (!e.until || ds <= e.until) && e.wd.includes(wd) && !(e.skip || []).includes(ds)
+    : e.date === ds)).map((e) => ({ ...e, kind: 'ev' }));
   yearlyOn(ds).forEach((y) => list.push({ id: y.id, title: y.title, who: y.who || 'family', kind: 'yearly', time: '' }));
   return list.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
 }
@@ -294,16 +307,31 @@ function renderDays2() {
 
 // ---------- 할 일 ----------
 function cleanTodos() {
-  // 끝낸 할 일은 다음 날이 되면 자동으로 정리한다
+  // 끝낸 할 일은 다음 날이 되면 자동으로 정리한다. 반복 할 일은 그날 것만 남긴다
   const ds = ymd(today());
-  for (const k in S.todos) S.todos[k] = S.todos[k].filter((x) => !x.done || x.doneAt === ds);
+  const wd = today().getDay();
+  let changed = false;
+  for (const k in S.todos) {
+    const before = S.todos[k].length;
+    S.todos[k] = S.todos[k].filter((x) => (x.rid ? x.day === ds : !x.done || x.doneAt === ds));
+    if (S.todos[k].length !== before) changed = true;
+  }
+  // 오늘 해당하는 반복 할 일을 넣는다 (맨 위에)
+  S.routines.forEach((r) => {
+    const L = S.todos[r.k];
+    if (!L || !r.days.includes(wd) || r.skip === ds || L.some((x) => x.rid === r.id)) return;
+    const at = L.filter((x) => x.rid).length;
+    L.splice(at, 0, { id: uid(), text: r.text, done: false, rid: r.id, day: ds });
+    changed = true;
+  });
+  if (changed) save();
 }
 function renderTodos() {
   const TINT = { kid: '#fff4df', mom: '#fdeaf1', dad: '#e6f0fd' };
   const card = (k) => {
     const list = S.todos[k];
     const done = list.filter((x) => x.done).length;
-    const items = list.length ? list.slice(0, 6).map((x) => `<div class="ti"><span class="chk ${x.done ? 'done' : ''}" data-act="toggleTodo" data-k="${k}" data-id="${x.id}">${esc(x.text)}</span><button class="x" data-act="delTodo" data-k="${k}" data-id="${x.id}">✕</button></div>`).join('') + (list.length > 6 ? `<div class="muted">+${list.length - 6}개 더</div>` : '') : '<div class="empty">할 일이 없어요<br>+를 눌러 넣어요</div>';
+    const items = list.length ? list.slice(0, 6).map((x) => `<div class="ti"><span class="chk ${x.done ? 'done' : ''}" data-act="toggleTodo" data-k="${k}" data-id="${x.id}">${esc(x.text)}${x.rid ? '<small class="rp">🔁</small>' : ''}</span><button class="x" data-act="delTodo" data-k="${k}" data-id="${x.id}">✕</button></div>`).join('') + (list.length > 6 ? `<div class="muted">+${list.length - 6}개 더</div>` : '') : '<div class="empty">할 일이 없어요<br>+를 눌러 넣어요</div>';
     const badge = !list.length ? '' : done === list.length ? '<span class="badge" style="--c:#34b37a">다 했어요!</span>' : `<span class="badge">${list.length - done}개 남음</span>`;
     return `<div class="mission" style="--tint:${TINT[k]};--c:${color(k)}"><div class="mh">${esc(nm(k))} 할 일 ${badge}<button class="add" data-act="addTodo" data-k="${k}">+</button></div>
       <div class="inner"><div class="tl">${items}</div><div class="foot"><div class="pbar"><i style="width:${list.length ? (done / list.length) * 100 : 0}%"></i></div>✓ ${done}/${list.length}</div></div></div>`;
@@ -341,10 +369,14 @@ function checkGrown() {
 }
 function addSticker(n, reason, by) {
   const before = growth();
+  const t0 = total();
   S.stickers.log.unshift({ id: uid(), date: ymd(today()), n, reason, by });
   const moved = checkGrown();
   save();
   const after = growth();
+  const t1 = total();
+  const hit = S.rewards.find((r) => !r.got && t0 < r.n && t1 >= r.n);
+  if (hit && !moved) { celebrate('img/polarbear-2.png', `🎁 '${hit.text}' 쿠폰을 받을 수 있어요!`); renderAll(); return; }
   if (moved) celebrate(`img/${moved.id}-3.png`, `${josa(moved.name, '을', '를')} 다 키웠어요! 마을로 이사 가요 🎉`);
   else if (after.stage > before.stage) celebrate(img(after.a, after.stage), `${STAGE_NAMES[after.stage]} ${josa(after.a.name, '으로', '로')} 자랐어요! ✨`);
   else toast(`⭐ 스티커 +${n}장 · ${reason}`);
@@ -401,12 +433,19 @@ function renderHero() {
 }
 // 메인 화면 그림은 늘 북극곰. 지금 북극곰을 키우는 중이면 그 단계 그림, 아니면 손 흔드는 북극곰
 function heroImg(g) { return g.a.id === 'polarbear' ? img(g.a, g.stage) : 'img/polarbear-2.png'; }
+function nextReward() { return S.rewards.filter((r) => !r.got).sort((a, b) => a.n - b.n)[0]; }
+function rewardMini() {
+  const r = nextReward();
+  if (!r) return `<div class="card" data-tab="village"><em>🏡</em><b>${S.stickers.grown.length}</b><span>마을 친구</span></div>`;
+  const left = r.n - total();
+  return `<div class="card" data-tab="sticker"><em>🎁</em><b>${left > 0 ? left + '장' : '받기!'}</b><span class="rwt">${esc(r.text)}${left > 0 ? '까지' : ' 쿠폰'}</span></div>`;
+}
 function renderData() {
   const g = growth();
   const pct = Math.min(100, Math.round((g.got / GROWN_AT) * 100));
   const C = 2 * Math.PI * 40;
   $('#data').innerHTML = `<div class="card ring" data-tab="village"><div class="rc"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" stroke="var(--soft)" stroke-width="10"/><circle cx="50" cy="50" r="40" stroke="var(--accent2)" stroke-width="10" stroke-dasharray="${(C * pct) / 100} ${C}" transform="rotate(-90 50 50)"/></svg><b>${pct}%</b></div><div class="rl2">${g.a.name} 다 키우기</div></div>
-    <div class="mini"><div class="card" data-tab="sticker"><em>⭐</em><b>${total()}</b><span>받은 스티커</span></div><div class="card" data-tab="village"><em>🏡</em><b>${S.stickers.grown.length}</b><span>마을 친구</span></div></div>`;
+    <div class="mini"><div class="card" data-tab="sticker"><em>⭐</em><b>${total()}</b><span>받은 스티커</span></div>${rewardMini()}</div>`;
 }
 
 // ---------- 다가오는 날 ----------
@@ -480,13 +519,23 @@ function renderVillage() {
 }
 
 // ---------- 스티커 페이지 ----------
+function couponsHtml() {
+  if (!S.rewards.length) return '<div class="empty">설정이나 + 버튼에서 보상 쿠폰을 만들어요. 예: 스티커 30장 = 아이스크림</div>';
+  const t = total();
+  return '<div class="coupons">' + S.rewards.map((r) => {
+    const pct = Math.min(100, Math.round((t / r.n) * 100));
+    const st = r.got ? `<span class="muted">받았어요 ✓ ${+r.got.slice(5, 7)}/${+r.got.slice(8)}</span>` : t >= r.n ? `<button class="btn" data-act="useReward" data-id="${r.id}">쿠폰 쓰기</button>` : `<span class="muted">${r.n - t}장 남음</span>`;
+    return `<div class="coupon ${r.got ? 'used' : t >= r.n ? 'ready' : ''}"><div class="cn">${r.n}장</div><div class="grow1"><b>${esc(r.text)}</b><div class="bar"><i style="width:${pct}%"></i></div></div>${st}</div>`;
+  }).join('') + '</div>';
+}
 function renderStickerPage() {
   const log = S.stickers.log.map((x) => `<div class="rowx"><span style="width:60px">${+x.date.slice(5, 7)}/${+x.date.slice(8)}</span><b style="color:#e8679a;width:56px">+${x.n}장</b><span class="grow1">${esc(x.reason)}</span><span class="muted">${esc(x.by)}</span><button class="x" data-act="delSticker" data-id="${x.id}">✕</button></div>`).join('') || '<div class="empty">아직 없어요</div>';
   $('#stickerPage').innerHTML = `<h2>⭐ ${esc(S.settings.names.kid)}의 스티커</h2>
     <div class="two"><div>
       <div class="bigcount">${total()}장</div>
-      <p class="note">잘한 일을 누르면 스티커 1장을 줘요. 엄마·아빠 비밀번호가 필요해요.<br>${esc(S.settings.names.kid)} 할 일을 하루에 다 끝내면 스티커 1장이 자동으로 생겨요.</p>
+      <p class="note">잘한 일을 누르면 스티커 1장을 줘요. 엄마·아빠 비밀번호가 필요해요. ${esc(S.settings.names.kid)} 할 일을 하루에 다 끝내면 1장이 자동으로 생겨요.</p>
       <div class="reasons">${REASONS.map((r) => `<button data-act="give" data-r="${esc(r)}">${esc(r)}</button>`).join('')}<button data-act="giveCustom">✏️ 직접 쓰기</button></div>
+      <h3>🎁 보상 쿠폰 <button class="add" data-act="addReward">+</button></h3>${couponsHtml()}
     </div><div>
       <h3 style="margin-top:0">받은 기록</h3>${log}
     </div></div>`;
@@ -507,6 +556,14 @@ function renderSettings() {
     </div>
     <h3>생일·기념일 (해마다 오는 날) <button class="add" data-act="addDay">+</button></h3>
     <div style="max-width:760px">${days}</div>
+    <h3>🔁 반복 할 일</h3>
+    <p class="note">할 일 카드의 + 에서 요일을 고르면 반복 할 일이 돼요.</p>
+    <div style="max-width:760px">${S.routines.map((r) => `<div class="rowx"><span class="grow1"><b style="color:${color(r.k === 'common' ? 'family' : r.k)}">●</b> ${esc(r.k === 'common' ? '공통' : nm(r.k))} · ${esc(r.text)}</span><span class="muted">${daysText(r.days)}</span><button class="x" data-act="delRoutine" data-id="${r.id}">✕</button></div>`).join('') || '<div class="empty">아직 없어요</div>'}</div>
+    <h3>🔁 매주 반복 일정</h3>
+    <div style="max-width:760px">${S.events.filter((e) => e.wd && e.wd.length).map((e) => `<div class="rowx"><span class="grow1"><b style="color:${color(e.who)}">●</b> ${esc(e.title)}</span><span class="muted">${daysText(e.wd)} ${e.time || ''}</span><button class="x" data-act="delWeekly" data-id="${e.id}">✕</button></div>`).join('') || '<div class="empty">달력의 + 에서 요일을 고르면 매주 반복 일정이 돼요.</div>'}</div>
+    <h3>🎁 스티커 보상 쿠폰 <button class="add" data-act="addReward">+</button></h3>
+    <p class="note">모은 스티커가 정한 장수에 닿으면 쿠폰을 쓸 수 있어요. 스티커는 줄어들지 않아요. 만들기·지우기·쓰기는 비밀번호가 필요해요.</p>
+    <div style="max-width:760px">${S.rewards.map((r) => `<div class="rowx"><b style="width:60px;color:var(--accent)">${r.n}장</b><span class="grow1">${esc(r.text)}</span><span class="muted">${r.got ? '받음 ' + r.got : ''}</span><button class="x" data-act="delReward" data-id="${r.id}">✕</button></div>`).join('') || '<div class="empty">아직 없어요</div>'}</div>
     <h3>화면 바꾸기</h3>
     <div class="setgrid">
       <span>화면 모드</span><select data-set="mode"><option value="auto" ${s.mode === 'auto' ? 'selected' : ''}>자동 (학교 시간엔 어른 화면)</option><option value="kid" ${s.mode === 'kid' ? 'selected' : ''}>늘 동물 화면</option><option value="adult" ${s.mode === 'adult' ? 'selected' : ''}>늘 어른 화면</option></select>
@@ -519,6 +576,7 @@ function renderSettings() {
     <h3>잠금·화면</h3>
     <div class="setgrid">
       <span>엄마·아빠 비밀번호</span><div class="inl"><button class="btn sub" data-act="changePin">비밀번호 바꾸기</button><span class="muted">${s.pin === '0000' ? '⚠️ 처음 비밀번호는 0000이에요. 꼭 바꿔 주세요.' : '설정됨'}</span></div>
+      <span>🌙 밤 화면</span><div class="inl"><button class="btn sub" data-act="nightToggle">${s.nightOn ? '켜짐' : '꺼짐'}</button><input type="time" data-set="nightStart" value="${s.nightStart}"> ~ <input type="time" data-set="nightEnd" value="${s.nightEnd}"></div>
       <span>화면 켜 두기</span><div class="inl"><button class="btn sub" data-act="wake">${s.wake ? '켜짐 (화면이 안 꺼져요)' : '꺼짐'}</button><button class="btn sub" data-act="full">전체 화면</button></div>
     </div>
     <h3>백업 (꼭 가끔 해 주세요)</h3>
@@ -541,6 +599,7 @@ function closeSheet() { $('#modal').classList.add('hidden'); modalDone = null; }
 function form({ title, fields, ok = '저장', extra = '' }, cb) {
   const html = `<h3>${title}</h3>` + fields.map((f) => {
     if (f.type === 'who') return `<label>${f.label}</label><div class="opts" data-name="${f.name}">${(f.options || ['family', 'kid', 'mom', 'dad']).map((k) => `<button type="button" data-v="${k}" class="${(f.value || 'family') === k ? 'on' : ''}">${esc(nm(k))}</button>`).join('')}</div>`;
+    if (f.type === 'days') return `<label>${f.label}</label><div class="opts multi" data-name="${f.name}">${[1, 2, 3, 4, 5, 6, 0].map((i) => `<button type="button" data-v="${i}" class="${(f.value || []).includes(i) ? 'on' : ''}">${WD[i]}</button>`).join('')}<button type="button" class="preset" data-preset="all">매일</button><button type="button" class="preset" data-preset="week">평일</button><button type="button" class="preset" data-preset="none">안 함</button></div>`;
     if (f.type === 'check') return `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="${f.name}" ${f.value ? 'checked' : ''}> ${f.label}</label>`;
     if (f.type === 'select') return `<label>${f.label}</label><select name="${f.name}">${f.options.map(([v, t]) => `<option value="${v}" ${String(f.value) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
     return `<label>${f.label}</label><input type="${f.type || 'text'}" name="${f.name}" value="${esc(f.value ?? '')}" placeholder="${esc(f.ph || '')}">`;
@@ -548,7 +607,9 @@ function form({ title, fields, ok = '저장', extra = '' }, cb) {
   openSheet(html, () => {
     const v = {};
     $('#sheet').querySelectorAll('[name]').forEach((el) => { v[el.name] = el.type === 'checkbox' ? el.checked : el.value.trim(); });
-    $('#sheet').querySelectorAll('.opts').forEach((el) => { v[el.dataset.name] = $('button.on', el)?.dataset.v; });
+    $('#sheet').querySelectorAll('.opts').forEach((el) => {
+      v[el.dataset.name] = el.classList.contains('multi') ? [...el.querySelectorAll('button.on[data-v]')].map((b) => +b.dataset.v) : $('button.on', el)?.dataset.v;
+    });
     return cb(v);
   });
 }
@@ -592,7 +653,7 @@ function celebrate(src, text) {
 function dayModal(ds) {
   const d = parse(ds);
   const evs = eventsOn(ds);
-  const list = evs.map((e) => `<div class="rowx"><span style="width:52px" class="muted">${e.time || '종일'}</span><span class="grow1" style="border-left:3px solid ${color(e.who)};padding-left:8px">${esc(e.title)}${e.off ? ' <small class="muted">(쉬는 날)</small>' : ''}${e.kind === 'yearly' ? ' <small class="muted">(해마다)</small>' : ''}</span>${e.kind === 'ev' ? `<button class="x" data-act="delEvent" data-id="${e.id}" data-day="${ds}">✕</button>` : ''}</div>`).join('') || '<div class="empty">일정이 없어요</div>';
+  const list = evs.map((e) => `<div class="rowx"><span style="width:52px" class="muted">${e.time || '종일'}</span><span class="grow1" style="border-left:3px solid ${color(e.who)};padding-left:8px">${esc(e.title)}${e.off ? ' <small class="muted">(쉬는 날)</small>' : ''}${e.kind === 'yearly' ? ' <small class="muted">(해마다)</small>' : ''}${e.wd && e.wd.length ? ` <small class="muted">(🔁 ${daysText(e.wd)})</small>` : ''}</span>${e.kind === 'ev' ? `<button class="x" data-act="delEvent" data-id="${e.id}" data-day="${ds}">✕</button>` : ''}</div>`).join('') || '<div class="empty">일정이 없어요</div>';
   openSheet(`<h3>${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]})${HOLIDAYS[ds] ? ' · ' + HOLIDAYS[ds] : ''}</h3><div class="list">${list}</div>
     <div class="foot2"><button class="btn sub" data-act="close">닫기</button><button class="btn" data-act="addEvent" data-day="${ds}">+ 일정 추가</button></div>`, null);
 }
@@ -602,12 +663,13 @@ function addEvent(ds) {
     { name: 'date', label: '날짜', type: 'date', value: ds || ymd(today()) },
     { name: 'time', label: '시간 (비우면 종일)', type: 'time' },
     { name: 'who', label: '누구 일정?', type: 'who', value: 'family' },
+    { name: 'wd', label: '매주 반복 (요일을 고르면 그날부터 매주 나와요)', type: 'days', value: [] },
     { name: 'off', label: '쉬는 날이에요 (학교 안 가요 → 동물 화면)', type: 'check' },
     { name: 'dday', label: '다가오는 날(D-day)에도 보여 주기', type: 'check' },
   ] }, (v) => {
     if (!v.title || !v.date) { toast('내용과 날짜를 넣어 주세요'); return false; }
-    S.events.push({ id: uid(), title: v.title, date: v.date, time: v.time, who: v.who, off: v.off, dday: v.dday });
-    save(); renderAll(); toast('일정을 넣었어요');
+    S.events.push({ id: uid(), title: v.title, date: v.date, time: v.time, who: v.who, off: v.off, dday: v.dday, wd: v.wd });
+    save(); renderAll(); toast(v.wd.length ? `${daysText(v.wd)} 반복 일정을 넣었어요` : '일정을 넣었어요');
   });
 }
 function addDay() {
@@ -650,6 +712,31 @@ function toggleMusic() {
   step();
 }
 
+// ---------- 밤 화면 (어둡게, 시계만 크게) ----------
+let nightWake = 0;
+function isNight(now = today()) {
+  const { nightOn, nightStart: a, nightEnd: b } = S.settings;
+  if (!nightOn) return false;
+  const hm = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  return a > b ? hm >= a || hm < b : hm >= a && hm < b;
+}
+function renderNight() {
+  const el = $('#night');
+  const on = isNight() && Date.now() > nightWake && $('#modal').classList.contains('hidden');
+  el.classList.toggle('hidden', !on);
+  if (!on) return;
+  const d = today();
+  const h = d.getHours();
+  const tm = addDays(d, h < 12 ? 0 : 1);
+  const evs = eventsOn(ymd(tm)).filter((e) => e.time);
+  const first = evs[0];
+  el.innerHTML = `<div class="nd">${d.getMonth() + 1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일</div>
+    <div class="nt"><span>${h < 12 ? '오전' : '오후'}</span>${h % 12 || 12}:${pad2(d.getMinutes())}</div>
+    ${first ? `<div class="nn">${h < 12 ? '오늘' : '내일'} 첫 일정 · ${first.time} ${esc(first.title)}</div>` : ''}
+    <img src="img/polarbear-1.png" alt=""><div class="nz">z z z</div>
+    <div class="nh">화면을 누르면 3분 동안 켜져요</div>`;
+}
+
 // ---------- 화면 켜 두기 ----------
 let wakeLock = null;
 async function keepAwake() {
@@ -672,14 +759,25 @@ const ACT = {
   close: closeSheet,
   submit() { if (modalDone && modalDone() !== false) closeSheet(); },
   addEvent(el) { addEvent(el.dataset.day); },
-  delEvent(el) { const e = S.events.find((x) => x.id === el.dataset.id); S.events = S.events.filter((x) => x.id !== el.dataset.id); save(); renderAll(); dayModal(el.dataset.day); toast('일정을 지웠어요', () => { S.events.push(e); save(); renderAll(); }); },
+  delEvent(el) {
+    const e = S.events.find((x) => x.id === el.dataset.id);
+    if (e && e.wd && e.wd.length) {
+      openSheet(`<h3>🔁 반복 일정이에요</h3><p class="note">'${esc(e.title)}' (${daysText(e.wd)})</p><div class="foot2" style="flex-wrap:wrap"><button class="btn sub" data-act="close">취소</button><button class="btn sub" data-act="delEventOne" data-id="${e.id}" data-day="${el.dataset.day}">이 날만 지우기</button><button class="btn red" data-act="delEventAll" data-id="${e.id}" data-day="${el.dataset.day}">반복 모두 지우기</button></div>`, null);
+      return;
+    }
+    ACT.delEventAll(el);
+  },
+  delEventOne(el) { const e = S.events.find((x) => x.id === el.dataset.id); (e.skip = e.skip || []).push(el.dataset.day); save(); renderAll(); dayModal(el.dataset.day); toast('이 날 일정만 지웠어요'); },
+  delEventAll(el) { const e = S.events.find((x) => x.id === el.dataset.id); S.events = S.events.filter((x) => x.id !== el.dataset.id); save(); renderAll(); dayModal(el.dataset.day); toast('일정을 지웠어요', () => { S.events.push(e); save(); renderAll(); }); },
   addDay,
   delDay(el) { if (confirm('이 기념일을 지울까요?')) { S.days = S.days.filter((x) => x.id !== el.dataset.id); save(); renderAll(); } },
   addTodo(el) {
     const k = el.dataset.k;
-    form({ title: `${k === 'common' ? '공통' : nm(k)} 할 일 추가`, fields: [{ name: 'text', label: '할 일', ph: '예: 책 반납하기' }] }, (v) => {
+    form({ title: `${k === 'common' ? '공통' : nm(k)} 할 일 추가`, fields: [{ name: 'text', label: '할 일', ph: '예: 양치하기, 책 반납하기' }, { name: 'days', label: '반복 (고르면 그 요일마다 자동으로 생겨요)', type: 'days', value: [] }] }, (v) => {
       if (!v.text) return false;
-      S.todos[k].push({ id: uid(), text: v.text, done: false }); save(); renderAll();
+      if (v.days.length) { S.routines.push({ id: uid(), k, text: v.text, days: v.days }); toast(`${daysText(v.days)} 반복 할 일을 넣었어요 🔁`); }
+      else S.todos[k].push({ id: uid(), text: v.text, done: false });
+      save(); renderAll();
     });
   },
   toggleTodo(el) {
@@ -691,9 +789,29 @@ const ACT = {
   },
   delTodo(el) {
     const k = el.dataset.k; const list = S.todos[k]; const i = list.findIndex((y) => y.id === el.dataset.id);
+    const r = list[i] && list[i].rid && S.routines.find((y) => y.id === list[i].rid);
+    if (r) {
+      openSheet(`<h3>🔁 반복 할 일이에요</h3><p class="note">'${esc(r.text)}' (${daysText(r.days)})</p><div class="foot2" style="flex-wrap:wrap"><button class="btn sub" data-act="close">취소</button><button class="btn sub" data-act="skipRoutine" data-id="${r.id}">오늘만 지우기</button><button class="btn red" data-act="delRoutine" data-id="${r.id}">반복 그만하기</button></div>`, null);
+      return;
+    }
     const [x] = list.splice(i, 1); save(); renderAll();
     toast(`'${x.text}' 지웠어요`, () => { list.splice(i, 0, x); save(); renderAll(); });
   },
+  skipRoutine(el) { const r = S.routines.find((y) => y.id === el.dataset.id); r.skip = ymd(today()); for (const k in S.todos) S.todos[k] = S.todos[k].filter((x) => x.rid !== r.id); save(); closeSheet(); renderAll(); toast('오늘만 지웠어요. 다음에 또 나와요'); },
+  delRoutine(el) { S.routines = S.routines.filter((y) => y.id !== el.dataset.id); for (const k in S.todos) S.todos[k] = S.todos[k].filter((x) => x.rid !== el.dataset.id); save(); closeSheet(); renderAll(); toast('반복을 그만했어요'); },
+  delWeekly(el) { if (confirm('이 반복 일정을 모두 지울까요?')) { S.events = S.events.filter((y) => y.id !== el.dataset.id); save(); renderAll(); } },
+  addReward() {
+    askPin(() => form({ title: '🎁 보상 쿠폰 만들기', fields: [{ name: 'n', label: '스티커 몇 장이면?', type: 'number', value: 30 }, { name: 'text', label: '보상', ph: '예: 아이스크림, 놀이공원, 게임 30분' }] }, (v) => {
+      const n = parseInt(v.n, 10);
+      if (!v.text || !(n > 0)) { toast('장수와 보상을 넣어 주세요'); return false; }
+      S.rewards.push({ id: uid(), n, text: v.text, got: '' }); S.rewards.sort((a, b) => a.n - b.n); save(); renderAll(); toast('보상 쿠폰을 만들었어요');
+    }));
+  },
+  delReward(el) { askPin(() => { S.rewards = S.rewards.filter((y) => y.id !== el.dataset.id); save(); renderAll(); }); },
+  useReward(el) {
+    askPin(() => { const r = S.rewards.find((y) => y.id === el.dataset.id); r.got = ymd(today()); save(); renderAll(); celebrate('img/polarbear-2.png', `🎁 ${r.text} 쿠폰 사용! 축하해요`); });
+  },
+  nightToggle() { S.settings.nightOn = !S.settings.nightOn; save(); renderAll(); renderNight(); },
   addShop() {
     form({ title: '장보기 추가', fields: [{ name: 'text', label: '살 것 (쉼표로 여러 개)', ph: '예: 우유, 계란, 사과' }] }, (v) => {
       if (!v.text) return false;
@@ -796,7 +914,16 @@ document.addEventListener('click', (ev) => {
   const p = ev.target.closest('[data-pin]');
   if (p && pinHandler) { const k = p.dataset.pin; pinHandler(k === '취소' || k === '⌫' ? k : String(k)); return; }
   const o = ev.target.closest('.opts button');
-  if (o) { o.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === o)); return; }
+  if (o) {
+    const box = o.parentElement;
+    if (o.dataset.preset) {
+      const pick = { all: [0, 1, 2, 3, 4, 5, 6], week: [1, 2, 3, 4, 5], none: [] }[o.dataset.preset];
+      box.querySelectorAll('button[data-v]').forEach((b) => b.classList.toggle('on', pick.includes(+b.dataset.v)));
+    } else if (box.classList.contains('multi')) o.classList.toggle('on');
+    else box.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === o));
+    return;
+  }
+  if (ev.target.closest('#night')) { nightWake = Date.now() + 3 * 60 * 1000; renderNight(); return; }
   const a = ev.target.closest('[data-act]');
   if (a && ACT[a.dataset.act]) { ACT[a.dataset.act](a); return; }
   const t = ev.target.closest('[data-tab]');
@@ -839,14 +966,13 @@ function demoData() {
   const t = today();
   const on = (n) => ymd(addDays(t, n));
   d.settings.kidBirth = `${t.getFullYear() - 10}-${pad2(((t.getMonth() + 1) % 12) + 1)}-12`;
-  d.todos.kid = [{ id: uid(), text: '수학 익힘책 2쪽' }, { id: uid(), text: '줄넘기 100번' }, { id: uid(), text: '책가방 챙기기' }].map((x) => ({ ...x, done: false }));
+  d.todos.kid = [{ id: uid(), text: '수학 익힘책 2쪽' }, { id: uid(), text: '줄넘기 100번' }].map((x) => ({ ...x, done: false }));
   d.todos.mom = ['책 반납하기', '식물 물 주기', '겨울옷 정리'].map((t2) => ({ id: uid(), text: t2, done: false }));
-  d.todos.dad = ['분리수거', '자동차 점검 예약', '사진 정리하기'].map((t2) => ({ id: uid(), text: t2, done: false }));
+  d.todos.dad = ['자동차 점검 예약', '사진 정리하기'].map((t2) => ({ id: uid(), text: t2, done: false }));
   d.todos.common = [{ id: uid(), text: '가족 사진 고르기', done: false }];
   d.shopping = ['우유', '사과', '식빵', '요거트'].map((t2) => ({ id: uid(), text: t2 }));
   d.events = [
     { id: uid(), title: '도서관 가기', date: on(0), time: '16:00', who: 'kid' },
-    { id: uid(), title: '피아노 학원', date: on(0), time: '17:30', who: 'kid' },
     { id: uid(), title: '가족 주말 브런치', date: on(1), time: '11:00', who: 'family' },
     { id: uid(), title: '건강 검진', date: on(3), time: '09:00', who: 'dad' },
     { id: uid(), title: '미술 교실', date: on(4), time: '15:00', who: 'kid' },
@@ -855,6 +981,13 @@ function demoData() {
     { id: uid(), title: '영화 보는 날', date: on(12), time: '', who: 'family' },
     { id: uid(), title: '학교 재량휴업일', date: on(15), time: '', who: 'kid', off: true },
   ];
+  d.routines = [
+    { id: uid(), k: 'kid', text: '양치하기', days: [0, 1, 2, 3, 4, 5, 6] },
+    { id: uid(), k: 'kid', text: '책가방 챙기기', days: [0, 1, 2, 3, 4] },
+    { id: uid(), k: 'dad', text: '분리수거', days: [2, 5] },
+  ];
+  d.events.push({ id: uid(), title: '피아노 학원', date: on(-7), time: '15:30', who: 'kid', wd: [2, 4] });
+  d.rewards = [{ id: uid(), n: 30, text: '아이스크림', got: on(-5) }, { id: uid(), n: 60, text: '보드게임 하나 사기', got: '' }, { id: uid(), n: 100, text: '놀이공원 가기', got: '' }];
   d.days = [
     { id: uid(), title: '엄마 생일', m: 3, d: 2, lunar: false, who: 'mom' },
     { id: uid(), title: '아빠 생일', m: 8, d: 21, lunar: false, who: 'dad' },
@@ -893,9 +1026,11 @@ keepAwake();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepAwake(); renderAll(); } });
 document.addEventListener('click', () => { if (S.settings.wake && !wakeLock) keepAwake(); }, { once: true });
 let lastDay = ymd(today());
+renderNight();
 setInterval(() => {
   renderClock();
   applyTheme();
+  renderNight();
   const ds = ymd(today());
   if (ds !== lastDay) { lastDay = ds; renderAll(); }
 }, 1000 * 15);
