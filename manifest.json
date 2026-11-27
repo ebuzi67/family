@@ -4,7 +4,7 @@
   "short_name": "가족 대시보드",
   "start_url": "./",
   "scope": "./",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "landscape",
   "background_color": "#e9f0fa",
   "theme_color": "#e9f0fa",

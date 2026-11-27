@@ -174,9 +174,34 @@ function applyTheme() {
 }
 
 // ---------- 화면 크기 맞추기 ----------
+// 기기마다 화면 크기를 재는 값이 달라서, 가장 작은 값 + 둥근 모서리·카메라 자리(safe-area)를 빼고 맞춘다
+function safeArea() {
+  let p = $('#safeProbe');
+  if (!p) {
+    p = document.createElement('div');
+    p.id = 'safeProbe';
+    p.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+    document.body.appendChild(p);
+  }
+  const c = getComputedStyle(p);
+  return { t: parseFloat(c.paddingTop) || 0, r: parseFloat(c.paddingRight) || 0, b: parseFloat(c.paddingBottom) || 0, l: parseFloat(c.paddingLeft) || 0 };
+}
+function screenBox() {
+  const de = document.documentElement;
+  const w = Math.min(innerWidth, de.clientWidth || innerWidth);
+  const h = Math.min(innerHeight, de.clientHeight || innerHeight);
+  return { w, h };
+}
 function fit() {
-  const s = Math.min(innerWidth / 1280, innerHeight / 800);
-  $('#stage').style.transform = `translate(-50%, -50%) scale(${s})`;
+  const { w, h } = screenBox();
+  const sa = safeArea();
+  const zoom = ((S && S.settings.zoom) || 100) / 100;
+  const W = w - sa.l - sa.r, H = h - sa.t - sa.b;
+  const s = Math.min(W / 1280, H / 800) * zoom;
+  const st = $('#stage');
+  st.style.left = `${sa.l + W / 2}px`;
+  st.style.top = `${sa.t + H / 2}px`;
+  st.style.transform = `translate(-50%, -50%) scale(${s})`;
 }
 
 // ---------- 시계 ----------
@@ -577,6 +602,8 @@ function renderSettings() {
     <div class="setgrid">
       <span>엄마·아빠 비밀번호</span><div class="inl"><button class="btn sub" data-act="changePin">비밀번호 바꾸기</button><span class="muted">${s.pin === '0000' ? '⚠️ 처음 비밀번호는 0000이에요. 꼭 바꿔 주세요.' : '설정됨'}</span></div>
       <span>🌙 밤 화면</span><div class="inl"><button class="btn sub" data-act="nightToggle">${s.nightOn ? '켜짐' : '꺼짐'}</button><input type="time" data-set="nightStart" value="${s.nightStart}"> ~ <input type="time" data-set="nightEnd" value="${s.nightEnd}"></div>
+      <span>화면 크기</span><div class="inl"><button class="btn sub" data-act="zoomDown">－ 작게</button><b style="min-width:52px;text-align:center">${s.zoom || 100}%</b><button class="btn sub" data-act="zoomUp">＋ 크게</button><span class="muted">가장자리가 잘리면 작게 해 보세요</span></div>
+      <span>화면 정보</span><span class="muted">${(() => { const b2 = screenBox(); const sa = safeArea(); return `보이는 크기 ${b2.w}×${b2.h} · 화면 ${screen.width}×${screen.height} · 배율 ${devicePixelRatio} · 가장자리 ${sa.t}/${sa.r}/${sa.b}/${sa.l}`; })()}</span>
       <span>화면 켜 두기</span><div class="inl"><button class="btn sub" data-act="wake">${s.wake ? '켜짐 (화면이 안 꺼져요)' : '꺼짐'}</button><button class="btn sub" data-act="full">전체 화면</button></div>
     </div>
     <h3>백업 (꼭 가끔 해 주세요)</h3>
@@ -811,6 +838,8 @@ const ACT = {
   useReward(el) {
     askPin(() => { const r = S.rewards.find((y) => y.id === el.dataset.id); r.got = ymd(today()); save(); renderAll(); celebrate('img/polarbear-2.png', `🎁 ${r.text} 쿠폰 사용! 축하해요`); });
   },
+  zoomDown() { S.settings.zoom = Math.max(70, (S.settings.zoom || 100) - 3); save(); fit(); renderAll(); },
+  zoomUp() { S.settings.zoom = Math.min(110, (S.settings.zoom || 100) + 3); save(); fit(); renderAll(); },
   nightToggle() { S.settings.nightOn = !S.settings.nightOn; save(); renderAll(); renderNight(); },
   addShop() {
     form({ title: '장보기 추가', fields: [{ name: 'text', label: '살 것 (쉼표로 여러 개)', ph: '예: 우유, 계란, 사과' }] }, (v) => {
@@ -1019,6 +1048,9 @@ function renderAll() {
 load();
 fit();
 addEventListener('resize', fit);
+addEventListener('orientationchange', () => setTimeout(fit, 300));
+document.addEventListener('fullscreenchange', () => setTimeout(fit, 300));
+setTimeout(fit, 500); setTimeout(fit, 2000);
 applyTheme();
 renderAll();
 fetchWeather();
