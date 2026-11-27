@@ -21,7 +21,7 @@ const CITIES = {
   gwangju: ['광주', 35.1595, 126.8526], ulsan: ['울산', 35.5384, 129.3114], busan: ['부산', 35.1796, 129.0756],
   jeju: ['제주', 33.4996, 126.5312], chuncheon: ['춘천', 37.8813, 127.7298], jeonju: ['전주', 35.8242, 127.148],
 };
-const STATUS = [['🏠', '집에 있어요'], ['💼', '회사'], ['🌙', '야근 중'], ['🚗', '오는 중'], ['🏃', '운동 중'], ['🛒', '장보는 중'], ['🍽️', '약속'], ['😴', '자는 중']];
+const STATUS = [['🏠', '집'], ['💼', '회사'], ['🌙', '야근 중'], ['🚗', '오는 중'], ['🏃', '운동 중'], ['🛒', '장보는 중'], ['🍽️', '약속'], ['😴', '자는 중']];
 const REASONS = ['양치를 혼자 했어요', '숙제를 다 했어요', '정리정돈을 했어요', '책을 읽었어요', '심부름을 했어요', '골고루 먹었어요', '일찍 잤어요', '동생·친구를 도왔어요'];
 
 // 공휴일 (대체공휴일 포함). 해마다 여기에 다음 해를 더하면 된다.
@@ -154,7 +154,7 @@ function applyTheme() {
   const now = today();
   const t = wantTheme(now);
   const h = now.getHours();
-  const cls = ['theme-' + t];
+  const cls = ['notranslate', 'theme-' + t];
   if (t === 'adult') cls.push(h >= 19 || h < 6 ? 'night' : h >= 14 ? 'eve' : 'day');
   document.body.className = cls.join(' ');
   $('#modeBtn').textContent = { auto: '◐ 자동', adult: '◐ 어른', kid: '◐ 아이' }[S.settings.mode];

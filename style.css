@@ -150,7 +150,7 @@ input, select, textarea { font: inherit; color: #222; }
 .kid { flex: 1.3; display: flex; flex-direction: column; }
 .kid .kbody { display: flex; gap: 8px; align-items: center; flex: 1; min-height: 0; }
 .kid img { width: 118px; height: 150px; object-fit: contain; flex: none; }
-.kid .nm { font-family: var(--round); font-size: 22px; white-space: nowrap; }
+.kid .nm { font-family: var(--round); font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kid .ks { font-size: 14px; font-weight: 700; }
 .lv { display: inline-block; background: #2b2f4a; color: #ffd84d; border-radius: 6px; padding: 0 6px; font-size: 13px; margin-left: 4px; font-family: var(--font); font-weight: 800; vertical-align: 2px; }
 .bar { height: 9px; border-radius: 9px; background: rgba(120,120,140,.2); margin: 6px 0 4px; overflow: hidden; border: 1.5px solid var(--line); }
@@ -173,7 +173,8 @@ input, select, textarea { font: inherit; color: #222; }
 .theme-adult .st { background: var(--soft); }
 .st .em { font-size: 34px; }
 .st .who { font-size: 12px; opacity: .75; }
-.st .what { font-size: 17px; font-weight: 800; }
+.st .what { font-size: 16px; font-weight: 800; white-space: nowrap; }
+.st .who { white-space: nowrap; }
 
 .foot { position: absolute; left: 18px; right: 18px; bottom: 6px; display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); }
 .theme-adult .foot { color: #f4f7fc; }
